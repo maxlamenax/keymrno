@@ -1,0 +1,221 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>guitare-clavier — terminal</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
+--bg:#0b0f0c;--fg:#b9f5c8;--dim:#5f8a6b;--hi:#ffd866;--err:#ff6b6b;--line:#1f3a29;color-scheme:dark}
+@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f1e6;--fg:#1d3b26;--dim:#6b7f70;--hi:#a45a00;--err:#b3261e;--line:#c9d1bd;color-scheme:light}}
+:root[data-theme="light"]{--bg:#f4f1e6;--fg:#1d3b26;--dim:#6b7f70;--hi:#a45a00;--err:#b3261e;--line:#c9d1bd;color-scheme:light}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 "SF Mono",Menlo,Consolas,"DejaVu Sans Mono","Courier New",monospace}
+main{max-width:860px;margin:0 auto;padding:16px 14px 40px}
+pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit}
+.dim{color:var(--dim)}.hi{color:var(--hi)}.err{color:var(--err)}
+.sec{border-top:1px dashed var(--line);margin-top:14px;padding-top:10px}
+.cmd{display:flex;gap:16px;flex-wrap:wrap}
+button{font:inherit;background:none;border:0;color:var(--fg);cursor:pointer;padding:2px 0}
+button:hover,button:focus-visible{color:var(--hi);outline:0;text-decoration:underline}
+button::before{content:"[ ";color:var(--dim)}button::after{content:" ]";color:var(--dim)}
+.cfg{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;max-width:520px}
+input[type=range]{width:100%;accent-color:var(--fg)}
+select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:2px 4px}
+#vu{letter-spacing:1px}
+#cur{font-size:2.4rem;line-height:1.1}
+#out{min-height:7em;padding:8px;border:1px solid var(--line)}
+#out::after{content:"█";animation:b 1s steps(1) infinite;color:var(--fg)}
+@keyframes b{50%{opacity:0}}
+#log{height:9.5em;overflow:auto;border:1px solid var(--line);padding:6px 8px}
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:2px 8px}
+.map span.hit{background:var(--fg);color:var(--bg)}
+@media (prefers-reduced-motion:reduce){#out::after{animation:none}}
+</style>
+</head>
+<body>
+<main>
+<pre class="dim">┌──────────────────────────────────────────┐
+│ guitare-clavier v0.2   pitch → keystroke │
+└──────────────────────────────────────────┘</pre>
+<pre><span class="hi">$</span> ./guitare --mic <span id="st" class="dim">(arrêté)</span></pre>
+
+<div class="sec cmd">
+  <button id="go">démarrer</button>
+  <button id="clr">effacer</button>
+  <button id="cpy">copier</button>
+</div>
+
+<div class="sec">
+  <pre class="dim">## note détectée</pre>
+  <div id="cur">–</div>
+  <pre><span class="dim">freq:</span> <span id="hz">---</span>  <span class="dim">touche:</span> <span id="key" class="hi">-</span></pre>
+  <pre><span class="dim">niveau</span> <span id="vu">[··········]</span></pre>
+</div>
+
+<div class="sec">
+  <pre class="dim">## configuration</pre>
+  <div class="cfg">
+    <label for="sens" class="dim">seuil</label>
+    <input id="sens" type="range" min="1" max="60" value="12">
+    <label for="oct" class="dim">octave</label>
+    <select id="oct"><option value="-1">−1</option><option value="0" selected>0 (Mi grave = e)</option><option value="1">+1</option></select>
+  </div>
+</div>
+
+<div class="sec">
+  <pre class="dim">## sortie (stdout)</pre>
+  <pre id="out"></pre>
+</div>
+
+<div class="sec">
+  <pre class="dim">## journal</pre>
+  <div id="log"><pre class="dim">en attente du micro…</pre></div>
+</div>
+
+<div class="sec">
+  <pre class="dim">## mapping  note → touche</pre>
+  <div class="map" id="map"></div>
+</div>
+</main>
+
+<script>
+(function(){
+var NAMES=["Do","Do♯","Ré","Ré♯","Mi","Fa","Fa♯","Sol","Sol♯","La","La♯","Si"];
+var LETTERS="eastinrloudcmpvgbfhqjkxyzw".split("");
+var SPECIAL=[["␣"," "],["⌫","BS"],["↵","\n"],[".","."],[",",","],["⇧","SHIFT"],["’","’"],["?","?"],["!","!"],["-","-"]];
+var KEYS=[];
+LETTERS.forEach(function(l){KEYS.push([l,l]);});
+SPECIAL.forEach(function(s){KEYS.push(s);});
+var BASE=40;
+var $=function(i){return document.getElementById(i);};
+var text="",shift=false,ctx,analyser,stream,raf,running=false;
+var buf,lastNote=null,stable=0,cand=null,prevRms=0,lastT=0;
+
+function base(){return BASE+12*parseInt($("oct").value,10);}
+function noteName(m){return NAMES[((m%12)+12)%12]+(Math.floor(m/12)-1);}
+function render(){$("out").textContent=text;}
+function log(s,cls){
+  var l=$("log"),p=document.createElement("pre");
+  var d=new Date(),t=("0"+d.getHours()).slice(-2)+":"+("0"+d.getMinutes()).slice(-2)+":"+("0"+d.getSeconds()).slice(-2);
+  p.className=cls||"";p.textContent="["+t+"] "+s;l.appendChild(p);
+  while(l.children.length>60)l.removeChild(l.firstChild);
+  l.scrollTop=l.scrollHeight;
+}
+function drawMap(){
+  var b=base(),h="";
+  KEYS.forEach(function(k,i){
+    var m=b+i,lab=k[0]==="\n"?"↵":k[0];
+    h+='<span data-m="'+m+'">'+noteName(m)+" → "+lab+"</span>";
+  });
+  $("map").innerHTML=h;
+}
+drawMap();$("oct").onchange=drawMap;
+
+function type(k){
+  if(k==="BS"){text=text.slice(0,-1);render();return;}
+  if(k==="SHIFT"){shift=!shift;log("majuscule "+(shift?"activée":"désactivée"),"dim");return;}
+  if(shift&&k.length===1){k=k.toUpperCase();shift=false;}
+  text+=k;render();
+}
+
+function detect(x,sr,gate){
+  var n=x.length>>1,i,rms=0;
+  for(i=0;i<x.length;i++)rms+=x[i]*x[i];
+  rms=Math.sqrt(rms/x.length);
+  if(rms<gate)return{rms:rms,f:-1};
+  var maxLag=Math.floor(sr/70),minLag=Math.floor(sr/700);
+  var nsdf=new Float32Array(maxLag+1),lag,j,acf,m;
+  for(lag=minLag;lag<=maxLag;lag++){
+    acf=0;m=0;
+    for(j=0;j<n;j++){acf+=x[j]*x[j+lag];m+=x[j]*x[j]+x[j+lag]*x[j+lag];}
+    nsdf[lag]=m>0?2*acf/m:0;
+  }
+  var peaks=[],pos=false,best=0,bi=-1;
+  for(lag=minLag+1;lag<maxLag;lag++){
+    if(nsdf[lag]<0)pos=true;
+    if(pos&&nsdf[lag]>0.5&&nsdf[lag]>=nsdf[lag-1]&&nsdf[lag]>nsdf[lag+1])peaks.push(lag);
+  }
+  if(!peaks.length)return{rms:rms,f:-1};
+  peaks.forEach(function(p){if(nsdf[p]>best)best=nsdf[p];});
+  for(i=0;i<peaks.length;i++){if(nsdf[peaks[i]]>=0.9*best){bi=peaks[i];break;}}
+  var a=nsdf[bi-1],b=nsdf[bi],c=nsdf[bi+1],den=a-2*b+c;
+  var off=den?0.5*(a-c)/den:0;
+  return{rms:rms,f:sr/(bi+off)};
+}
+
+function vu(r){
+  var n=Math.min(10,Math.round(r*60));
+  $("vu").textContent="["+"█".repeat(n)+"·".repeat(10-n)+"]";
+}
+
+function loop(t){
+  raf=requestAnimationFrame(loop);
+  if(t-lastT<40)return;lastT=t;
+  analyser.getFloatTimeDomainData(buf);
+  var gate=parseInt($("sens").value,10)/1000;
+  var r=detect(buf,ctx.sampleRate,gate);
+  vu(r.rms);
+  if(r.f<0){
+    stable=0;cand=null;
+    if(r.rms<gate*0.6)lastNote=null;
+    prevRms=r.rms;return;
+  }
+  var midi=Math.round(69+12*Math.log2(r.f/440));
+  $("cur").textContent=noteName(midi);
+  $("hz").textContent=r.f.toFixed(1)+" Hz";
+  var k=KEYS[midi-base()];
+  $("key").textContent=k?(k[0]==="\n"?"↵":k[0]):"hors plage";
+  if(midi===cand)stable++;else{cand=midi;stable=1;}
+  var replucked=r.rms>prevRms*1.8&&midi===lastNote;
+  if(stable>=3&&(midi!==lastNote||replucked)){
+    lastNote=midi;stable=0;
+    if(k){
+      type(k[1]);
+      log(noteName(midi)+" "+r.f.toFixed(1)+"Hz → "+(k[0]==="\n"?"↵":k[0]));
+      var el=document.querySelector('#map [data-m="'+midi+'"]');
+      if(el){el.classList.add("hit");setTimeout(function(){el.classList.remove("hit");},250);}
+    }else log(noteName(midi)+" hors plage","err");
+  }
+  prevRms=r.rms;
+}
+
+$("go").onclick=function(){
+  if(running){
+    cancelAnimationFrame(raf);
+    stream.getTracks().forEach(function(t){t.stop();});
+    ctx.close();running=false;
+    $("go").textContent="démarrer";$("st").textContent="(arrêté)";$("st").className="dim";
+    log("micro arrêté","dim");return;
+  }
+  if(!navigator.mediaDevices||!navigator.mediaDevices.getUserMedia){
+    log("erreur: micro indisponible dans ce navigateur","err");return;
+  }
+  navigator.mediaDevices.getUserMedia({audio:{echoCancellation:false,noiseSuppression:false,autoGainControl:false}})
+  .then(function(s){
+    stream=s;ctx=new (window.AudioContext||window.webkitAudioContext)();
+    analyser=ctx.createAnalyser();analyser.fftSize=4096;
+    ctx.createMediaStreamSource(s).connect(analyser);
+    buf=new Float32Array(analyser.fftSize);
+    running=true;$("go").textContent="arrêter";
+    $("st").textContent="(écoute)";$("st").className="hi";
+    log("micro actif à "+ctx.sampleRate+" Hz","hi");
+    raf=requestAnimationFrame(loop);
+  }).catch(function(){log("erreur: accès au micro refusé","err");});
+};
+$("clr").onclick=function(){text="";shift=false;render();log("sortie effacée","dim");};
+$("cpy").onclick=function(){
+  var done=function(){log("texte copié","hi");};
+  if(navigator.clipboard&&navigator.clipboard.writeText){
+    navigator.clipboard.writeText(text).then(done,function(){log("copie impossible","err");});
+  }else{
+    var ta=document.createElement("textarea");ta.value=text;document.body.appendChild(ta);ta.select();
+    try{document.execCommand("copy");done();}catch(e){log("copie impossible","err");}
+    document.body.removeChild(ta);
+  }
+};
+})();
+</script>
+</body>
+</html>
