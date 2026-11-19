@@ -1,84 +1,125 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" class="crt">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>guitare-clavier — terminal</title>
+<title>MRNO — guitare-clavier</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet">
 <style>
 :root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);
---bg:#0b0f0c;--fg:#b9f5c8;--dim:#5f8a6b;--hi:#ffd866;--err:#ff6b6b;--line:#1f3a29;color-scheme:dark}
-@media (prefers-color-scheme:light){:root:not([data-theme="dark"]){--bg:#f4f1e6;--fg:#1d3b26;--dim:#6b7f70;--hi:#a45a00;--err:#b3261e;--line:#c9d1bd;color-scheme:light}}
-:root[data-theme="light"]{--bg:#f4f1e6;--fg:#1d3b26;--dim:#6b7f70;--hi:#a45a00;--err:#b3261e;--line:#c9d1bd;color-scheme:light}
+--border:#00004a;--bg:#000080;--fg:#ffff00;--cy:#00ffff;--wh:#ffffff;--dim:#8f8fe0;--sel:#ffff00;--seltxt:#000080;--err:#ff7070;--scan:.16;color-scheme:dark}
 html{scroll-padding-top:env(safe-area-inset-top,0px)}
 *{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font:15px/1.55 "SF Mono",Menlo,Consolas,"DejaVu Sans Mono","Courier New",monospace}
-main{max-width:860px;margin:0 auto;padding:16px 14px 40px}
-pre{margin:0;white-space:pre-wrap;word-break:break-word;font:inherit}
-.dim{color:var(--dim)}.hi{color:var(--hi)}.err{color:var(--err)}
-.sec{border-top:1px dashed var(--line);margin-top:14px;padding-top:10px}
-.cmd{display:flex;gap:16px;flex-wrap:wrap}
-button{font:inherit;background:none;border:0;color:var(--fg);cursor:pointer;padding:2px 0}
-button:hover,button:focus-visible{color:var(--hi);outline:0;text-decoration:underline}
-button::before{content:"[ ";color:var(--dim)}button::after{content:" ]";color:var(--dim)}
-.cfg{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;align-items:center;max-width:520px}
+body{margin:0;background:var(--border);min-height:100vh;font:12px/2 "Press Start 2P","Courier New",monospace;color:var(--fg)}
+.frame{max-width:860px;margin:0 auto;padding:clamp(10px,4vw,36px)}
+.screen{position:relative;overflow:hidden;background:var(--bg);padding:20px 20px 26px;min-height:72vh;border-radius:6px}
+.cy{color:var(--cy)}.wh{color:var(--wh)}.dim{color:var(--dim)}.hi{color:var(--fg)}.err{color:var(--err)}
+h1{margin:.3em 0;font-size:clamp(1.4rem,6.4vw,2.8rem);line-height:1.2;letter-spacing:.1em;color:var(--wh);font-weight:400}
+pre{margin:0;font:inherit;white-space:pre-wrap;word-break:break-word}
+a,button{font:inherit;color:var(--cy);background:none;border:0;padding:0;cursor:pointer;text-decoration:none}
+button:hover{text-decoration:underline}
+:focus-visible{outline:2px solid var(--fg);outline-offset:3px}
+[hidden]{display:none!important}
+nav{display:flex;gap:16px 20px;flex-wrap:wrap;margin-bottom:16px}
+.lead{max-width:62ch;margin:.6em 0 1em}
+.cmd{display:flex;gap:6px 18px;flex-wrap:wrap;margin:14px 0 4px}
+.cmd button::before{content:"[";color:var(--dim)}.cmd button::after{content:"]";color:var(--dim)}
+.cmd button:hover,.cmd button:focus-visible{background:var(--sel);color:var(--seltxt);text-decoration:none}
+.sec{margin-top:18px}
+.sec h2{margin:0 0 4px;font-size:1em;font-weight:400;color:var(--cy);text-transform:uppercase;letter-spacing:.08em}
+.sec h2::before{content:"> "}
+.vt{font-family:"VT323","Courier New",monospace}
+#cur{font-size:clamp(2rem,10vw,3.4rem);line-height:1.2;color:var(--wh);min-height:1.2em}
+.info{font-size:.85em}
+.cfg{display:grid;grid-template-columns:auto 1fr;gap:6px 16px;align-items:center;max-width:520px}
+.cfg label{color:var(--cy)}
 input[type=range]{width:100%;accent-color:var(--fg)}
-select{font:inherit;background:var(--bg);color:var(--fg);border:1px solid var(--line);padding:2px 4px}
-#vu{letter-spacing:1px}
-#cur{font-size:2.4rem;line-height:1.1}
-#out{min-height:7em;padding:8px;border:1px solid var(--line)}
-#out::after{content:"█";animation:b 1s steps(1) infinite;color:var(--fg)}
+select{font:inherit;background:var(--bg);color:var(--fg);border:2px solid var(--dim);padding:2px 6px}
+#out{font-size:1.7rem;line-height:1.2;min-height:6em;padding:8px 10px;border:2px solid var(--dim);color:var(--wh)}
+#out::after{content:"█";color:var(--fg);animation:b 1s steps(1) infinite}
 @keyframes b{50%{opacity:0}}
-#log{height:9.5em;overflow:auto;border:1px solid var(--line);padding:6px 8px}
-.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:2px 8px}
-.map span.hit{background:var(--fg);color:var(--bg)}
+#log{height:9em;overflow:auto;border:2px solid var(--dim);padding:6px 10px;font-size:1.3rem;line-height:1.15}
+.map{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:2px 10px;font-size:1.25rem;line-height:1.2}
+.map span.hit{background:var(--sel);color:var(--seltxt)}
+footer{margin-top:20px;color:var(--dim);font-size:.75em}
 @media (prefers-reduced-motion:reduce){#out::after{animation:none}}
+/* ---- effets CRT (inchangés) ---- */
+.crt .screen{border-radius:22px/16px;box-shadow:inset 0 0 90px rgba(0,0,0,.65),inset 0 0 14px rgba(255,255,255,.08),0 0 50px rgba(0,0,0,.5);animation:flick 4s infinite}
+.crt .screen::before{content:"";position:absolute;inset:0;pointer-events:none;z-index:5;
+ background:repeating-linear-gradient(to bottom,rgba(0,0,0,0) 0,rgba(0,0,0,0) 2px,rgba(0,0,0,var(--scan)) 3px,rgba(0,0,0,var(--scan)) 4px)}
+.crt .screen::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:6;
+ background:radial-gradient(ellipse at center,rgba(255,255,255,.04) 0,rgba(0,0,0,0) 55%,rgba(0,0,0,.5) 100%)}
+.band{display:none;position:absolute;left:0;right:0;height:90px;top:-90px;pointer-events:none;z-index:4;
+ background:linear-gradient(to bottom,rgba(255,255,255,0),rgba(255,255,255,.05),rgba(255,255,255,0));animation:roll 7s linear infinite}
+.crt .band{display:block}
+@keyframes roll{to{transform:translateY(calc(72vh + 180px))}}
+@keyframes flick{0%,100%{filter:brightness(1)}47%{filter:brightness(1)}48%{filter:brightness(1.05)}50%{filter:brightness(.97)}52%{filter:brightness(1)}}
+@media (prefers-reduced-motion:reduce){.cur::after,.crt .screen,.band,#view.in,.msg span{animation:none}}
+@media (max-width:560px){body{font-size:10px}}
+
+/* ---- effet CRT additionnel : grille RVB, scintillement, vibration du texte (d'après D3NN7 / P. Lauke) ---- */
+.fx-grid,.fx-flick{display:none;position:absolute;inset:0;pointer-events:none}
+.fx-grid{z-index:7;background:linear-gradient(rgba(18,16,16,0) 50%,rgba(0,0,0,.25) 50%),linear-gradient(90deg,rgba(255,0,0,.06),rgba(0,255,0,.02),rgba(0,0,255,.06));background-size:100% 2px,3px 100%}
+.fx-flick{z-index:7;background:rgba(18,16,16,.1);opacity:0;animation:fxflick .15s infinite}
+.crt .fx-grid,.crt .fx-flick{display:block}
+@keyframes fxflick{0%{opacity:0.459}5%{opacity:0.321}10%{opacity:0.721}15%{opacity:0.258}20%{opacity:0.629}25%{opacity:0.493}30%{opacity:0.246}35%{opacity:0.606}40%{opacity:0.230}45%{opacity:0.547}50%{opacity:0.256}55%{opacity:0.273}60%{opacity:0.540}65%{opacity:0.861}70%{opacity:0.299}75%{opacity:0.379}80%{opacity:0.702}85%{opacity:0.958}90%{opacity:0.662}95%{opacity:0.517}100%{opacity:.3}}
+@keyframes fxtext{0%{text-shadow:2.55px 0 1px rgba(0,30,255,.5),1.58px 0 1px rgba(255,0,80,.35),0 0 3px}6%{text-shadow:0.97px 0 1px rgba(0,30,255,.5),-1.54px 0 1px rgba(255,0,80,.35),0 0 3px}12%{text-shadow:1.59px 0 1px rgba(0,30,255,.5),0.54px 0 1px rgba(255,0,80,.35),0 0 3px}18%{text-shadow:1.16px 0 1px rgba(0,30,255,.5),1.60px 0 1px rgba(255,0,80,.35),0 0 3px}24%{text-shadow:-1.44px 0 1px rgba(0,30,255,.5),-2.09px 0 1px rgba(255,0,80,.35),0 0 3px}30%{text-shadow:-1.65px 0 1px rgba(0,30,255,.5),1.13px 0 1px rgba(255,0,80,.35),0 0 3px}36%{text-shadow:2.13px 0 1px rgba(0,30,255,.5),-0.49px 0 1px rgba(255,0,80,.35),0 0 3px}42%{text-shadow:-1.51px 0 1px rgba(0,30,255,.5),-1.98px 0 1px rgba(255,0,80,.35),0 0 3px}48%{text-shadow:1.70px 0 1px rgba(0,30,255,.5),-0.57px 0 1px rgba(255,0,80,.35),0 0 3px}54%{text-shadow:-0.68px 0 1px rgba(0,30,255,.5),-0.65px 0 1px rgba(255,0,80,.35),0 0 3px}60%{text-shadow:1.27px 0 1px rgba(0,30,255,.5),-2.06px 0 1px rgba(255,0,80,.35),0 0 3px}66%{text-shadow:-1.08px 0 1px rgba(0,30,255,.5),-1.67px 0 1px rgba(255,0,80,.35),0 0 3px}72%{text-shadow:0.46px 0 1px rgba(0,30,255,.5),-2.47px 0 1px rgba(255,0,80,.35),0 0 3px}78%{text-shadow:1.90px 0 1px rgba(0,30,255,.5),-0.44px 0 1px rgba(255,0,80,.35),0 0 3px}84%{text-shadow:-1.79px 0 1px rgba(0,30,255,.5),-0.95px 0 1px rgba(255,0,80,.35),0 0 3px}90%{text-shadow:-2.34px 0 1px rgba(0,30,255,.5),-0.35px 0 1px rgba(255,0,80,.35),0 0 3px}96%{text-shadow:1.12px 0 1px rgba(0,30,255,.5),1.44px 0 1px rgba(255,0,80,.35),0 0 3px}100%{text-shadow:0.4px 0 1px rgba(0,30,255,.5),-0.4px 0 1px rgba(255,0,80,.35),0 0 3px}}
+.crt .screen{animation:flick 4s infinite,fxtext 1.6s steps(1) infinite}
+@media (prefers-reduced-motion:reduce){.fx-flick,.crt .screen{animation:none}}
 </style>
 </head>
 <body>
-<main>
-<pre class="dim">┌──────────────────────────────────────────┐
-│ guitare-clavier v0.2   pitch → keystroke │
-└──────────────────────────────────────────┘</pre>
-<pre><span class="hi">$</span> ./guitare --mic <span id="st" class="dim">(arrêté)</span></pre>
+<div class="frame"><div class="screen">
+<div class="band"></div>
+<div class="fx-grid"></div><div class="fx-flick"></div>
 
-<div class="sec cmd">
+<nav aria-label="Navigation"><button id="crtbtn" aria-pressed="true">CRT:ON</button></nav>
+
+<h1>KEYMRNO</h1>
+<p class="lead cy">guitare-clavier · pitch → frappe <span id="st" class="dim">(arrêté)</span></p>
+
+<div class="cmd">
   <button id="go">démarrer</button>
   <button id="clr">effacer</button>
   <button id="cpy">copier</button>
 </div>
 
 <div class="sec">
-  <pre class="dim">## note détectée</pre>
-  <div id="cur">–</div>
-  <pre><span class="dim">freq:</span> <span id="hz">---</span>  <span class="dim">touche:</span> <span id="key" class="hi">-</span></pre>
-  <pre><span class="dim">niveau</span> <span id="vu">[··········]</span></pre>
+  <h2>note détectée</h2>
+  <div id="cur" class="vt">–</div>
+  <div class="info dim">freq: <span id="hz" class="wh">---</span> · touche: <span id="key" class="hi">-</span></div>
+  <div class="info dim">niveau <span id="vu" class="cy">[··········]</span></div>
 </div>
 
 <div class="sec">
-  <pre class="dim">## configuration</pre>
+  <h2>configuration</h2>
   <div class="cfg">
-    <label for="sens" class="dim">seuil</label>
+    <label for="sens">seuil</label>
     <input id="sens" type="range" min="1" max="60" value="12">
-    <label for="oct" class="dim">octave</label>
+    <label for="oct">octave</label>
     <select id="oct"><option value="-1">−1</option><option value="0" selected>0 (Mi grave = e)</option><option value="1">+1</option></select>
   </div>
 </div>
 
 <div class="sec">
-  <pre class="dim">## sortie (stdout)</pre>
-  <pre id="out"></pre>
+  <h2>sortie</h2>
+  <pre id="out" class="vt"></pre>
 </div>
 
 <div class="sec">
-  <pre class="dim">## journal</pre>
-  <div id="log"><pre class="dim">en attente du micro…</pre></div>
+  <h2>journal</h2>
+  <div id="log" class="vt"><pre class="dim">en attente du micro…</pre></div>
 </div>
 
 <div class="sec">
-  <pre class="dim">## mapping  note → touche</pre>
-  <div class="map" id="map"></div>
+  <h2>mapping note → touche</h2>
+  <div class="map vt" id="map"></div>
 </div>
-</main>
+
+<footer>© 2026 MRNO — la guitare qui tape à la machine</footer>
+</div></div>
 
 <script>
 (function(){
@@ -215,6 +256,10 @@ $("cpy").onclick=function(){
     document.body.removeChild(ta);
   }
 };
+})();
+(function(){
+var b=document.getElementById("crtbtn");
+b.onclick=function(){var on=document.documentElement.classList.toggle("crt");b.textContent="CRT:"+(on?"ON":"OFF");b.setAttribute("aria-pressed",on);};
 })();
 </script>
 </body>
