@@ -1,0 +1,980 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>KEYMRNO Desktop — Amstrad Guitar Typewriter &amp; Tuner</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=VT323&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --cpc-blue: #000080;
+      --cpc-dark-blue: #000055;
+      --cpc-yellow: #ffff00;
+      --cpc-cyan: #00ffff;
+      --cpc-green: #00ff00;
+      --cpc-red: #ff3333;
+      --cpc-white: #ffffff;
+    }
+
+    * {
+      box-sizing: border-box;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    html, body {
+      margin: 0;
+      padding: 0;
+      background-color: var(--cpc-blue);
+      color: var(--cpc-yellow);
+      font-family: 'VT323', monospace;
+      min-height: 100dvh;
+      overflow-x: hidden;
+      user-select: none;
+    }
+
+    /* Subtle Amstrad CRT scanline overlay */
+    body::before {
+      content: "";
+      position: fixed;
+      inset: 0;
+      background: linear-gradient(
+        rgba(0, 0, 0, 0) 50%,
+        rgba(0, 0, 40, 0.28) 50%
+      );
+      background-size: 100% 4px;
+      pointer-events: none;
+      z-index: 50;
+    }
+
+    .cpc-pixel-title {
+      font-family: 'Press Start 2P', monospace;
+      letter-spacing: 0.06em;
+    }
+
+    /* Double-line Amstrad CPC frame */
+    .cpc-box {
+      background-color: var(--cpc-dark-blue);
+      border: 3px solid var(--cpc-cyan);
+      box-shadow:
+        inset 0 0 0 2px var(--cpc-blue),
+        inset 0 0 0 4px var(--cpc-cyan),
+        4px 4px 0px #000033;
+    }
+
+    .cpc-box-yellow {
+      background-color: var(--cpc-dark-blue);
+      border: 3px solid var(--cpc-yellow);
+      box-shadow:
+        inset 0 0 0 2px var(--cpc-blue),
+        inset 0 0 0 4px var(--cpc-yellow),
+        4px 4px 0px #000033;
+    }
+
+    /* Tactile Amstrad buttons */
+    .cpc-btn {
+      background-color: var(--cpc-blue);
+      border: 2px solid var(--cpc-cyan);
+      color: var(--cpc-yellow);
+      box-shadow: 3px 3px 0px #000033;
+      transition: transform 0.06s ease, background-color 0.08s ease;
+      cursor: pointer;
+    }
+
+    .cpc-btn:active,
+    .cpc-btn.is-pressed {
+      transform: translate(2px, 2px);
+      box-shadow: 1px 1px 0px #000033;
+      background-color: var(--cpc-yellow);
+      color: var(--cpc-blue);
+      border-color: var(--cpc-white);
+    }
+
+    .cpc-btn-mic {
+      background-color: var(--cpc-yellow);
+      color: var(--cpc-blue);
+      border: 3px solid var(--cpc-white);
+      box-shadow: 4px 4px 0px #000033;
+    }
+
+    .cpc-btn-mic.is-live {
+      background-color: var(--cpc-green);
+      color: #000033;
+      border-color: var(--cpc-white);
+    }
+
+    /* Pad keycaps */
+    .pad-key {
+      background-color: #000066;
+      border: 2px solid var(--cpc-cyan);
+      box-shadow: 2px 2px 0px #000033;
+      transition: transform 0.06s ease, background-color 0.08s ease;
+      cursor: pointer;
+    }
+
+    .pad-key.is-open-string {
+      border-color: var(--cpc-yellow);
+    }
+
+    .pad-key:active,
+    .pad-key.is-active {
+      transform: translate(2px, 2px);
+      box-shadow: none;
+      background-color: var(--cpc-yellow) !important;
+      border-color: var(--cpc-white) !important;
+    }
+
+    .pad-key:active .pad-note,
+    .pad-key.is-active .pad-note,
+    .pad-key:active .pad-letter,
+    .pad-key.is-active .pad-letter {
+      color: var(--cpc-blue) !important;
+    }
+
+    @keyframes blinkBlock {
+      0%, 49% { opacity: 1; }
+      50%, 100% { opacity: 0; }
+    }
+
+    .cpc-btn:hover, .pad-key:hover { filter: brightness(1.3); }
+    .cpc-cursor {
+      display: inline-block;
+      width: 0.55em;
+      height: 0.95em;
+      background-color: var(--cpc-yellow);
+      vertical-align: middle;
+      margin-left: 3px;
+      animation: blinkBlock 0.9s infinite;
+    }
+  </style>
+</head>
+<body class="flex flex-col items-center justify-start px-2.5 py-2.5 sm:py-8">
+
+  <!-- Vertical Phone Container -->
+  <div class="w-full max-w-[1100px] grid grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)] gap-4 items-start relative z-10">
+
+    <!-- 1. COMPACT HEADER -->
+    <header class="col-span-2 flex items-center justify-between px-1">
+      <a href="http://maxmusiclab.free.fr/mrnolink.html"
+         class="text-lg text-[#00ffff] hover:text-[#ffff00] leading-none">
+        ← MRNO
+      </a>
+      <div class="text-center">
+        <h1 class="cpc-pixel-title text-base sm:text-lg text-[#ffff00] leading-tight">
+          KEYMRNO
+        </h1>
+        <p class="text-sm text-[#00ffff] leading-none mt-0.5">
+          Play a note, type a letter.
+        </p>
+      </div>
+      <span id="statusTag" class="text-base text-[#00ffff] font-bold">
+        READY
+      </span>
+    </header>
+
+    <!-- 2. PRIMARY MIC BUTTON + OCTAVE & TUNER MODE ROW -->
+    <section class="flex flex-col gap-2">
+      <button id="micToggleBtn"
+              type="button"
+              class="cpc-btn-mic w-full py-2.5 px-3 text-center font-bold text-xl sm:text-2xl tracking-wider uppercase">
+        [ MIC: OFF — TAP TO PLAY ]
+      </button>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button id="octaveToggleBtn"
+                type="button"
+                class="cpc-btn py-1.5 px-2 text-lg font-bold text-center">
+          OCT: 0 (E2=E)
+        </button>
+
+        <button id="modeToggleBtn"
+                type="button"
+                class="cpc-btn py-1.5 px-2 text-lg font-bold text-center text-[#00ffff]">
+          MODE: TYPE
+        </button>
+      </div>
+    </section>
+
+    <!-- 3. CENTRAL LIVE DISPLAY (SWITCHES BETWEEN TYPEWRITER & TUNER) -->
+    <section class="cpc-box p-3">
+      <!-- TYPEWRITER LIVE VIEW -->
+      <div id="typeLivePanel" class="flex flex-col gap-1.5">
+        <div class="flex items-center justify-between text-base text-[#00ffff] leading-none">
+          <span>LIVE PITCH → KEY</span>
+          <span id="liveFreqReadout">--.- Hz</span>
+        </div>
+
+        <div class="flex items-center justify-center gap-3 py-1">
+          <span id="liveNoteBadge" class="text-4xl sm:text-5xl font-bold text-[#00ffff] tracking-wide">
+            --
+          </span>
+          <span class="text-3xl text-[#ffffff]">→</span>
+          <span id="liveKeyBadge" class="text-4xl sm:text-5xl font-bold text-[#ffff00] tracking-wide">
+            _
+          </span>
+        </div>
+
+        <div class="flex items-center justify-between text-base leading-none pt-0.5">
+          <span id="signalBars" class="text-[#00ff00] tracking-widest">LVL [··········]</span>
+          <span id="lockStatusText" class="text-[#00ffff]">WAIT</span>
+        </div>
+      </div>
+
+      <!-- CHROMATIC GUITAR TUNER VIEW -->
+      <div id="tunerLivePanel" class="hidden flex-col gap-2">
+        <div class="flex items-center justify-between text-base text-[#00ffff] leading-none">
+          <span>CHROMATIC TUNER (A4=440)</span>
+          <span id="tunerFreqReadout">--.- Hz</span>
+        </div>
+
+        <!-- Note + Cents Deviation -->
+        <div class="flex items-baseline justify-center gap-4 py-0.5">
+          <span id="tunerNoteReadout" class="text-5xl font-bold text-[#ffff00] leading-none">
+            --
+          </span>
+          <span id="tunerCentsReadout" class="text-2xl font-bold text-[#00ffff] leading-none">
+            0c
+          </span>
+        </div>
+
+        <!-- Visual Centered Needle Bar (-50c to +50c) -->
+        <div class="relative w-full h-6 bg-[#000033] border-2 border-[#00ffff] flex items-center">
+          <!-- Center In-Tune Target Zone -->
+          <div class="absolute left-1/2 -translate-x-1/2 w-5 h-full bg-[#00ff00]/20 border-x border-[#00ff00]"></div>
+          <!-- Center Tick -->
+          <div class="absolute left-1/2 -translate-x-1/2 w-0.5 h-full bg-[#ffffff]"></div>
+          <!-- Moving Needle -->
+          <div id="tunerNeedle"
+               class="absolute left-1/2 -translate-x-1/2 w-2.5 h-4 bg-[#00ffff] transition-all duration-75"
+               style="left: 50%;"></div>
+        </div>
+
+        <div class="flex justify-between text-xs text-[#00ffff] leading-none px-0.5">
+          <span>-50c FLAT</span>
+          <span id="tunerInTuneLabel" class="font-bold text-[#ffff00]">PLUCK STRING</span>
+          <span>+50c SHARP</span>
+        </div>
+
+        <!-- Standard Guitar Reference Pitch Buttons (E2 A2 D3 G3 B3 E4) -->
+        <div class="grid grid-cols-6 gap-1 pt-1">
+          <button type="button" data-ref-midi="40" class="ref-tune-btn cpc-btn py-1 text-base font-bold text-center">E2</button>
+          <button type="button" data-ref-midi="45" class="ref-tune-btn cpc-btn py-1 text-base font-bold text-center">A2</button>
+          <button type="button" data-ref-midi="50" class="ref-tune-btn cpc-btn py-1 text-base font-bold text-center">D3</button>
+          <button type="button" data-ref-midi="55" class="ref-tune-btn cpc-btn py-1 text-base font-bold text-center">G3</button>
+          <button type="button" data-ref-midi="59" class="ref-tune-btn cpc-btn py-1 text-base font-bold text-center">B3</button>
+          <button type="button" data-ref-midi="64" class="ref-tune-btn cpc-btn py-1 text-base font-bold text-center">E4</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- 4. CENTERED OUTPUT WINDOW + QUICK ACTIONS -->
+    <section class="cpc-box-yellow p-2.5 flex flex-col gap-2">
+      <div id="outputFrame"
+           class="relative w-full min-h-[104px] max-h-[130px] bg-[#000033] border-2 border-[#00ffff] px-3 py-2 flex items-center justify-center text-center overflow-y-auto">
+        <div id="conceptHint" class="absolute inset-0 flex items-center justify-center text-center px-3 text-lg leading-tight text-[#00ffff] opacity-40 pointer-events-none" style="white-space:pre-line"></div>
+        <div class="relative text-2xl sm:text-3xl font-bold text-[#ffff00] tracking-wider leading-snug break-words whitespace-pre-wrap w-full">
+          <span id="outputText"></span><span class="cpc-cursor" aria-hidden="true"></span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-4 gap-1.5 text-base font-bold">
+        <button id="btnSpace" type="button" class="cpc-btn py-1 text-center">SPACE</button>
+        <button id="btnDel" type="button" class="cpc-btn py-1 text-center">DEL</button>
+        <button id="btnCopy" type="button" class="cpc-btn py-1 text-center text-[#00ff00]">COPY</button>
+        <button id="btnClear" type="button" class="cpc-btn py-1 text-center text-[#ff6666]">CLEAR</button>
+      </div>
+    </section>
+
+    <!-- 5. FULL A-Z + SPACE + DEL CHROMATIC NOTE PAD (ENLARGED NOTE LABELS) -->
+    <section class="cpc-box p-3 col-start-2 row-start-2 row-span-3">
+      <div id="notePadGrid" class="grid grid-cols-4 gap-2">
+        <!-- Rendered dynamically by JS -->
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Toast Banner (No alert()) -->
+  <div id="toastMsg"
+       class="fixed bottom-3 left-1/2 -translate-x-1/2 z-50 px-3 py-1 bg-[#ffff00] text-[#000080] border-2 border-[#ffffff] font-bold text-lg shadow-lg opacity-0 pointer-events-none transition-opacity duration-150">
+    COPIED!
+  </div>
+
+  <script>
+    /**
+     * KEYMRNO — Amstrad CPC Guitar-to-Keyboard Typewriter & Chromatic Tuner
+     * Pitch Detection Engine:
+     * - 4096-sample time-domain buffer for accurate low E2 (82.41 Hz) resolution
+     * - Biquad High-Pass (65 Hz) + Low-Pass (900 Hz) pre-filtering to eliminate pick noise & upper harmonics
+     * - YIN Pitch Detection Algorithm (Difference Function + CMNDF + Absolute Threshold 0.15 + Parabolic Interpolation)
+     * - 3-frame stability lock (±35 cents) + amplitude onset / pitch-change hysteresis to prevent double triggers
+     */
+
+    // Complete 28-key chromatic mapping (E2 -> G4) covering A-Z + SPACE + DEL
+    const NOTE_KEY_MAP = [
+      { midi: 40, note: 'E2',  key: 'E', displayKey: 'E', open: true },
+      { midi: 41, note: 'F2',  key: 'F', displayKey: 'F', open: false },
+      { midi: 42, note: 'F#2', key: 'R', displayKey: 'R', open: false },
+      { midi: 43, note: 'G2',  key: 'G', displayKey: 'G', open: false },
+      { midi: 44, note: 'G#2', key: 'T', displayKey: 'T', open: false },
+      { midi: 45, note: 'A2',  key: 'A', displayKey: 'A', open: true },
+      { midi: 46, note: 'A#2', key: 'Y', displayKey: 'Y', open: false },
+      { midi: 47, note: 'B2',  key: 'B', displayKey: 'B', open: false },
+      { midi: 48, note: 'C3',  key: 'C', displayKey: 'C', open: false },
+      { midi: 49, note: 'C#3', key: 'U', displayKey: 'U', open: false },
+      { midi: 50, note: 'D3',  key: 'D', displayKey: 'D', open: true },
+      { midi: 51, note: 'D#3', key: 'I', displayKey: 'I', open: false },
+      { midi: 52, note: 'E3',  key: 'M', displayKey: 'M', open: false },
+      { midi: 53, note: 'F3',  key: 'N', displayKey: 'N', open: false },
+      { midi: 54, note: 'F#3', key: 'O', displayKey: 'O', open: false },
+      { midi: 55, note: 'G3',  key: 'P', displayKey: 'P', open: true },
+      { midi: 56, note: 'G#3', key: 'Q', displayKey: 'Q', open: false },
+      { midi: 57, note: 'A3',  key: 'S', displayKey: 'S', open: false },
+      { midi: 58, note: 'A#3', key: 'V', displayKey: 'V', open: false },
+      { midi: 59, note: 'B3',  key: 'W', displayKey: 'W', open: true },
+      { midi: 60, note: 'C4',  key: 'X', displayKey: 'X', open: false },
+      { midi: 61, note: 'C#4', key: 'Z', displayKey: 'Z', open: false },
+      { midi: 62, note: 'D4',  key: 'H', displayKey: 'H', open: false },
+      { midi: 63, note: 'D#4', key: 'J', displayKey: 'J', open: false },
+      { midi: 64, note: 'E4',  key: 'K', displayKey: 'K', open: true },
+      { midi: 65, note: 'F4',  key: 'L', displayKey: 'L', open: false },
+      { midi: 66, note: 'F#4', key: ' ', displayKey: '␣', open: false, special: 'SPACE' },
+      { midi: 67, note: 'G4',  key: 'BACKSPACE', displayKey: '⌫', open: false, special: 'DEL' }
+    ];
+
+    const LANG = ((new URLSearchParams(location.search).get('lang')) || (navigator.languages && navigator.languages[0]) || navigator.language || 'en').toLowerCase().startsWith('fr') ? 'fr' : 'en';
+    const IS_FR = LANG === 'fr';
+    // FR: Do Ré Mi...  |  EN: C D E...
+    const CHROMATIC_NAMES = IS_FR
+      ? ['Do', 'Do#', 'Ré', 'Ré#', 'Mi', 'Fa', 'Fa#', 'Sol', 'Sol#', 'La', 'La#', 'Si']
+      : ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    const FR_STR = {"[ MIC: OFF — TAP TO PLAY ]": "[ MICRO : OFF — APPUYEZ POUR JOUER ]", "[ MIC: ON — LISTENING ]": "[ MICRO : ON — J'ÉCOUTE ]", "READY": "PRÊT", "LIVE": "EN DIRECT", "WAIT": "ATTENTE", "MIC UNAVAILABLE — USE PAD BELOW": "MICRO INDISPONIBLE — UTILISEZ LE PAD", "LOCKED": "VERROUILLÉ", "HOLD..": "TENEZ..", "LISTEN": "ÉCOUTE", "PAD": "PAD", "EMPTY OUTPUT": "RIEN À COPIER", "COPIED TO CLIPBOARD!": "COPIÉ !", "★ IN TUNE ★": "★ ACCORDÉ ★", "TUNE UP ↑": "TENDEZ ↑", "TUNE DOWN ↓": "DÉTENDEZ ↓", "OCT: 0 (E2=E)": "OCT: 0 (Mi2=A)", "OCT: +1 (LOW)": "OCT: +1 (GRAVE)", "OCT: -1 (HIGH)": "OCT: -1 (AIGU)", "MODE: TUNER": "MODE: ACCORDEUR", "MODE: TYPE": "MODE: CLAVIER", "LIVE PITCH → KEY": "HAUTEUR → TOUCHE", "CHROMATIC TUNER (A4=440)": "ACCORDEUR CHROMATIQUE (La4=440)", "-50c FLAT": "-50c BAS", "+50c SHARP": "+50c HAUT", "PLUCK STRING": "JOUEZ UNE CORDE", "SPACE": "ESPACE", "DEL": "EFFAC.", "COPY": "COPIER", "CLEAR": "VIDER", "Play a note, type a letter.": "Jouez une note, tapez une lettre.", "LVL": "NIV", "REF": "RÉF"};
+    const tr = (s) => (IS_FR && FR_STR[s]) ? FR_STR[s] : s;
+    // Note labels follow the language. FR layout = chromatic alphabet:
+    // Mi grave = A, Fa = B, Fa# = C ... up to F4 = Z, then SPACE and DEL.
+    NOTE_KEY_MAP.forEach((it) => {
+      it.note = midiToFullNoteName(it.midi);
+      if (IS_FR && it.midi <= 65) { it.key = it.displayKey = String.fromCharCode(65 + it.midi - 40); }
+    });
+    const CONCEPT = IS_FR
+      ? 'Jouez une note à la guitare.\nChaque note tape une lettre.\nMi grave = A · Fa = B · Fa# = C …'
+      : 'Play a note on your guitar.\nEach note types a letter.\nPlay to write.';
+    function initUi() {
+      document.documentElement.lang = LANG;
+      document.querySelectorAll('body *').forEach((el) => {
+        if (!el.children.length && el.tagName !== 'SCRIPT') {
+          const s = el.textContent.trim();
+          if (FR_STR[s] && IS_FR) el.textContent = FR_STR[s];
+        }
+      });
+      document.querySelectorAll('.ref-tune-btn').forEach((b) => { b.textContent = midiToFullNoteName(+b.dataset.refMidi); });
+      const hint = document.getElementById('conceptHint');
+      hint.textContent = CONCEPT;
+      const upd = () => { hint.style.visibility = dom.outputText.textContent ? 'hidden' : 'visible'; };
+      new MutationObserver(upd).observe(dom.outputText, { childList: true, characterData: true, subtree: true });
+      upd();
+    }
+    const OCTAVE_OPTIONS = [0, 1, -1];
+
+    const appState = {
+      isListening: false,
+      mode: 'TYPE', // 'TYPE' or 'TUNER'
+      octaveIdx: 0,
+      audioCtx: null,
+      analyser: null,
+      micStream: null,
+      rafId: null,
+      timeBuffer: null,
+      text: '',
+      isDemoActive: false,
+      demoTimers: [],
+      // Pitch stability & onset hysteresis state
+      stableFrames: 0,
+      candidateMidi: null,
+      lastTriggeredMidi: null,
+      armedForRetrigger: true,
+      peakRmsSinceTrigger: 0,
+      minRmsSinceTrigger: 1,
+      noiseFloorRms: 0.014,
+      hist: [], tunerNote: null, smNote: null, smCents: 0,
+      calibUntil: 0, calibMin: 1
+    };
+
+    const dom = {
+      statusTag: document.getElementById('statusTag'),
+      micToggleBtn: document.getElementById('micToggleBtn'),
+      octaveToggleBtn: document.getElementById('octaveToggleBtn'),
+      modeToggleBtn: document.getElementById('modeToggleBtn'),
+      typeLivePanel: document.getElementById('typeLivePanel'),
+      tunerLivePanel: document.getElementById('tunerLivePanel'),
+      liveFreqReadout: document.getElementById('liveFreqReadout'),
+      liveNoteBadge: document.getElementById('liveNoteBadge'),
+      liveKeyBadge: document.getElementById('liveKeyBadge'),
+      signalBars: document.getElementById('signalBars'),
+      lockStatusText: document.getElementById('lockStatusText'),
+      tunerFreqReadout: document.getElementById('tunerFreqReadout'),
+      tunerNoteReadout: document.getElementById('tunerNoteReadout'),
+      tunerCentsReadout: document.getElementById('tunerCentsReadout'),
+      tunerNeedle: document.getElementById('tunerNeedle'),
+      tunerInTuneLabel: document.getElementById('tunerInTuneLabel'),
+      outputFrame: document.getElementById('outputFrame'),
+      outputText: document.getElementById('outputText'),
+      btnSpace: document.getElementById('btnSpace'),
+      btnDel: document.getElementById('btnDel'),
+      btnCopy: document.getElementById('btnCopy'),
+      btnClear: document.getElementById('btnClear'),
+      notePadGrid: document.getElementById('notePadGrid'),
+      toastMsg: document.getElementById('toastMsg')
+    };
+
+    // --- AUDIO & PITCH UTILITIES ---
+    function midiToFreq(midi) {
+      return 440 * Math.pow(2, (midi - 69) / 12);
+    }
+
+    function freqToMidiFloat(freq) {
+      return 69 + 12 * Math.log2(freq / 440);
+    }
+
+    function midiToFullNoteName(midi) {
+      const name = CHROMATIC_NAMES[((midi % 12) + 12) % 12];
+      const octave = Math.floor(midi / 12) - 1;
+      return `${name}${octave}`;
+    }
+
+    function getOctaveShift() {
+      return OCTAVE_OPTIONS[appState.octaveIdx];
+    }
+
+    function ensureAudioContext() {
+      if (!appState.audioCtx) {
+        const Ctx = window.AudioContext || window.webkitAudioContext;
+        appState.audioCtx = new Ctx();
+      }
+      if (appState.audioCtx.state === 'suspended') {
+        appState.audioCtx.resume();
+      }
+      return appState.audioCtx;
+    }
+
+    function showToast(message) {
+      dom.toastMsg.textContent = message;
+      dom.toastMsg.classList.remove('opacity-0');
+      clearTimeout(showToast._tid);
+      showToast._tid = setTimeout(() => {
+        dom.toastMsg.classList.add('opacity-0');
+      }, 1500);
+    }
+
+    // --- PLUCKED GUITAR SYNTHESIZER FOR PAD & TUNER REFERENCE ---
+    function playPluckedNote(midi, duration = 0.65) {
+      try {
+        const ctx = ensureAudioContext();
+        const now = ctx.currentTime;
+        const shiftedMidi = midi + getOctaveShift() * 12;
+        const freq = midiToFreq(shiftedMidi);
+
+        const osc1 = ctx.createOscillator();
+        const osc2 = ctx.createOscillator();
+        const filter = ctx.createBiquadFilter();
+        const gain = ctx.createGain();
+
+        osc1.type = 'sawtooth';
+        osc1.frequency.setValueAtTime(freq, now);
+
+        osc2.type = 'triangle';
+        osc2.frequency.setValueAtTime(freq * 2, now);
+
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(Math.min(freq * 5.5, 3200), now);
+        filter.frequency.exponentialRampToValueAtTime(Math.max(freq * 1.3, 160), now + duration * 0.8);
+
+        gain.gain.setValueAtTime(0.001, now);
+        gain.gain.linearRampToValueAtTime(0.22, now + 0.01);
+        gain.gain.exponentialRampToValueAtTime(0.0008, now + duration);
+
+        osc1.connect(filter);
+        osc2.connect(filter);
+        filter.connect(gain);
+        gain.connect(ctx.destination);
+
+        osc1.start(now);
+        osc2.start(now);
+        osc1.stop(now + duration + 0.02);
+        osc2.stop(now + duration + 0.02);
+      } catch (err) {
+        // Ignore if blocked before user gesture
+      }
+    }
+
+    // --- YIN PITCH DETECTION (decimated ~16 kHz, fixed CMNDF, adaptive threshold) ---
+    function detectPitchYIN(buffer, sampleRate) {
+      const n = buffer.length;
+      let sumSq = 0;
+      for (let i = 0; i < n; i++) sumSq += buffer[i] * buffer[i];
+      const rms = Math.sqrt(sumSq / n);
+      if (rms < appState.noiseFloorRms) return { freq: -1, rms, probability: 0 };
+
+      // Averaging decimation: cheap low-pass + ~6x less CPU
+      const dec = Math.max(1, Math.floor(sampleRate / 16000));
+      const sr = sampleRate / dec;
+      const m = Math.floor(n / dec);
+      const x = new Float32Array(m);
+      for (let i = 0; i < m; i++) {
+        let s = 0;
+        for (let k = 0; k < dec; k++) s += buffer[i * dec + k];
+        x[i] = s / dec;
+      }
+      const half = Math.floor(m / 2);
+      const minTau = Math.max(2, Math.floor(sr / 1100));
+      const maxTau = Math.min(half - 2, Math.floor(sr / 65));
+
+      // Difference function from tau = 1 (the old version skipped tau < minTau,
+      // which biased the cumulative normalisation and hid valid pitches)
+      const d = new Float32Array(maxTau + 2);
+      for (let tau = 1; tau <= maxTau + 1; tau++) {
+        let s = 0;
+        for (let i = 0; i < half; i++) { const e = x[i] - x[i + tau]; s += e * e; }
+        d[tau] = s;
+      }
+      d[0] = 1;
+      let run = 0;
+      for (let tau = 1; tau <= maxTau + 1; tau++) {
+        run += d[tau];
+        d[tau] = run === 0 ? 1 : d[tau] * tau / run;
+      }
+
+      // First dip under threshold -> walk down to the local minimum
+      let t = -1;
+      for (let tau = minTau; tau <= maxTau; tau++) {
+        if (d[tau] < 0.13) {
+          while (tau + 1 <= maxTau && d[tau + 1] < d[tau]) tau++;
+          t = tau;
+          break;
+        }
+      }
+      // Fallback: global minimum if the signal is a bit noisy
+      if (t === -1) {
+        let best = 1;
+        for (let tau = minTau; tau <= maxTau; tau++) if (d[tau] < best) { best = d[tau]; t = tau; }
+        if (best > 0.3) return { freq: -1, rms, probability: 0 };
+      }
+
+      // Parabolic interpolation
+      let bt = t;
+      if (t > 1 && t <= maxTau) {
+        const s0 = d[t - 1], s1 = d[t], s2 = d[t + 1];
+        const den = 2 * (2 * s1 - s2 - s0);
+        if (den !== 0) bt = t + (s2 - s0) / den;
+      }
+      const freq = sr / bt;
+      const probability = Math.max(0, 1 - d[t]);
+      if (freq < 65 || freq > 1100 || probability < 0.7) return { freq: -1, rms, probability };
+      return { freq, rms, probability };
+    }
+
+    // --- RENDER ENLARGED NOTE PAD (A-Z + SPACE + DEL) ---
+    function renderNotePad() {
+      dom.notePadGrid.innerHTML = '';
+      NOTE_KEY_MAP.forEach((item) => {
+        const btn = document.createElement('button');
+        btn.type = 'button';
+        btn.dataset.midi = item.midi;
+        btn.className = `pad-key py-2 px-1.5 flex items-center justify-between gap-1 ${
+          item.open ? 'is-open-string' : ''
+        }`;
+
+        // Enlarged, bold musical note label (E2, F2, F#2...)
+        const noteSpan = document.createElement('span');
+        noteSpan.className = `pad-note text-xl sm:text-2xl font-bold leading-none ${
+          item.open ? 'text-[#ffff00]' : 'text-[#00ffff]'
+        }`;
+        noteSpan.textContent = item.note;
+
+        // Mapped keyboard character badge
+        const keySpan = document.createElement('span');
+        keySpan.className = `pad-letter text-lg sm:text-xl font-bold px-1.5 py-0.5 bg-[#000033] border border-[#00ffff]/50 leading-none ${
+          item.special ? 'text-[#00ff00]' : 'text-[#ffffff]'
+        }`;
+        keySpan.textContent = item.displayKey;
+
+        btn.append(noteSpan, keySpan);
+
+        btn.addEventListener('click', () => {
+          handleVirtualPadPress(item);
+        });
+
+        dom.notePadGrid.appendChild(btn);
+      });
+    }
+
+    function flashPadKey(midi) {
+      const el = dom.notePadGrid.querySelector(`[data-midi="${midi}"]`);
+      if (!el) return;
+      el.classList.add('is-active');
+      clearTimeout(el._flashTimer);
+      el._flashTimer = setTimeout(() => {
+        el.classList.remove('is-active');
+      }, 220);
+    }
+
+    // --- OUTPUT & TYPEWRITER LOGIC ---
+    function stopDemoPreview() {
+      if (!appState.isDemoActive) return;
+      appState.isDemoActive = false;
+      appState.demoTimers.forEach((id) => clearTimeout(id));
+      appState.demoTimers = [];
+      appState.text = '';
+      dom.outputText.textContent = '';
+    }
+
+    function runInitialDemo() {
+      const sample = 'MRNO';
+      let i = 0;
+      function step() {
+        if (!appState.isDemoActive || i >= sample.length) return;
+        dom.outputText.textContent += sample[i];
+        i++;
+        appState.demoTimers.push(setTimeout(step, 220));
+      }
+      appState.demoTimers.push(setTimeout(step, 400));
+    }
+
+    function appendTypedKey(item) {
+      stopDemoPreview();
+      if (item.key === 'BACKSPACE') {
+        appState.text = appState.text.slice(0, -1);
+      } else {
+        appState.text += item.key;
+      }
+      dom.outputText.textContent = appState.text;
+      dom.outputFrame.scrollTop = dom.outputFrame.scrollHeight;
+
+      dom.liveNoteBadge.textContent = item.note;
+      dom.liveKeyBadge.textContent = item.displayKey;
+      flashPadKey(item.midi);
+    }
+
+    function handleVirtualPadPress(item) {
+      playPluckedNote(item.midi, 0.55);
+      const freq = midiToFreq(item.midi + getOctaveShift() * 12);
+
+      if (appState.mode === 'TUNER') {
+        updateTunerVisuals(freq, item.midi + getOctaveShift() * 12, 0);
+      } else {
+        dom.liveFreqReadout.textContent = `${freq.toFixed(1)} Hz`;
+        dom.lockStatusText.textContent = tr('PAD');
+        updateSignalMeter(0.8);
+        appendTypedKey(item);
+        setTimeout(() => {
+          if (!appState.isListening) updateSignalMeter(0);
+        }, 200);
+      }
+    }
+
+    // --- SIGNAL METER & TUNER UI UPDATES ---
+    function updateSignalMeter(normLevel) {
+      const clamped = Math.max(0, Math.min(1, normLevel));
+      const filled = Math.round(clamped * 10);
+      dom.signalBars.textContent = `${tr('LVL')} [${'█'.repeat(filled)}${'·'.repeat(10 - filled)}]`;
+    }
+
+    function updateTunerVisuals(freq, nearestMidi, cents) {
+      const noteName = midiToFullNoteName(nearestMidi);
+      const clampedCents = Math.max(-50, Math.min(50, cents));
+      const pct = 50 + (clampedCents / 50) * 46; // keep inside bar borders
+
+      dom.tunerFreqReadout.textContent = `${freq.toFixed(1)} Hz`;
+      dom.tunerNoteReadout.textContent = noteName;
+      dom.tunerCentsReadout.textContent = `${cents >= 0 ? '+' : ''}${cents}c`;
+      dom.tunerNeedle.style.left = `${pct}%`;
+
+      if (Math.abs(cents) <= 5) {
+        dom.tunerNoteReadout.className = 'text-5xl font-bold text-[#00ff00] leading-none';
+        dom.tunerCentsReadout.className = 'text-2xl font-bold text-[#00ff00] leading-none';
+        dom.tunerNeedle.style.backgroundColor = '#00ff00';
+        dom.tunerInTuneLabel.textContent = tr('★ IN TUNE ★');
+        dom.tunerInTuneLabel.className = 'font-bold text-[#00ff00]';
+      } else if (cents < -5) {
+        dom.tunerNoteReadout.className = 'text-5xl font-bold text-[#ffff00] leading-none';
+        dom.tunerCentsReadout.className = 'text-2xl font-bold text-[#00ffff] leading-none';
+        dom.tunerNeedle.style.backgroundColor = '#00ffff';
+        dom.tunerInTuneLabel.textContent = tr('TUNE UP ↑');
+        dom.tunerInTuneLabel.className = 'font-bold text-[#00ffff]';
+      } else {
+        dom.tunerNoteReadout.className = 'text-5xl font-bold text-[#ffff00] leading-none';
+        dom.tunerCentsReadout.className = 'text-2xl font-bold text-[#ff6666] leading-none';
+        dom.tunerNeedle.style.backgroundColor = '#ff6666';
+        dom.tunerInTuneLabel.textContent = tr('TUNE DOWN ↓');
+        dom.tunerInTuneLabel.className = 'font-bold text-[#ff6666]';
+      }
+    }
+
+    // --- REAL-TIME MICROPHONE AUDIO LOOP ---
+    function audioAnalysisLoop() {
+      if (!appState.isListening || !appState.analyser) return;
+
+      appState.analyser.getFloatTimeDomainData(appState.timeBuffer);
+      let { freq, rms } = detectPitchYIN(appState.timeBuffer, appState.audioCtx.sampleRate);
+      // Ambient noise calibration (first 450 ms after mic start)
+      if (appState.calibUntil) {
+        appState.calibMin = Math.min(appState.calibMin, rms);
+        if (performance.now() > appState.calibUntil) {
+          appState.noiseFloorRms = Math.max(0.006, Math.min(0.04, appState.calibMin * 2.5 + 0.003));
+          appState.calibUntil = 0;
+        }
+        freq = -1;
+      }
+
+      updateSignalMeter(Math.min(1, rms * 6.5));
+
+      // Track amplitude envelope for onset/re-trigger hysteresis
+      if (rms < appState.minRmsSinceTrigger) {
+        appState.minRmsSinceTrigger = rms;
+      }
+      if (rms > appState.peakRmsSinceTrigger) {
+        appState.peakRmsSinceTrigger = rms;
+      }
+      // Re-arm same-note typing if string decayed and was plucked again (+45% amplitude surge)
+      if (!appState.armedForRetrigger && appState.minRmsSinceTrigger > 0) {
+        if (rms > appState.minRmsSinceTrigger * 1.55 && rms > appState.noiseFloorRms * 1.6) {
+          appState.armedForRetrigger = true;
+        }
+      }
+
+      if (freq > 0) {
+        // 5-frame median in the pitch domain rejects octave glitches & pick attack
+        const hist = appState.hist;
+        const raw = freqToMidiFloat(freq);
+        if (hist.length && Math.abs(raw - hist[hist.length - 1]) > 0.8) hist.length = 0;
+        hist.push(raw);
+        if (hist.length > 5) hist.shift();
+        const midiFloat = [...hist].sort((a, b) => a - b)[hist.length >> 1];
+        let nearestMidi = Math.round(midiFloat);
+        // Hysteresis: don't flicker between two notes near +/-50 cents
+        if (appState.mode === 'TUNER' && appState.tunerNote !== null && Math.abs(midiFloat - appState.tunerNote) < 0.6) {
+          nearestMidi = appState.tunerNote;
+        }
+        appState.tunerNote = appState.mode === 'TUNER' ? nearestMidi : null;
+        const cents = Math.round((midiFloat - nearestMidi) * 100);
+        const shiftedMidi = nearestMidi + getOctaveShift() * 12;
+
+        if (appState.mode === 'TUNER') {
+          // Smooth, responsive tuner readout
+          const sm = appState.smNote === nearestMidi ? appState.smCents * 0.55 + cents * 0.45 : cents;
+          appState.smNote = nearestMidi; appState.smCents = sm;
+          updateTunerVisuals(freq, nearestMidi, Math.round(sm));
+          const mapped = NOTE_KEY_MAP.find((m) => m.midi === shiftedMidi);
+          if (mapped) flashPadKey(mapped.midi);
+        } else {
+          // Typewriter mode: require ±35 cents accuracy & 3 consistent frames
+          dom.liveFreqReadout.textContent = `${freq.toFixed(1)} Hz`;
+
+          if (Math.abs(cents) <= 35 && appState.candidateMidi === shiftedMidi) {
+            appState.stableFrames++;
+          } else if (Math.abs(cents) <= 35) {
+            appState.candidateMidi = shiftedMidi;
+            appState.stableFrames = 1;
+          } else {
+            appState.stableFrames = 0;
+          }
+
+          const mapped = NOTE_KEY_MAP.find((m) => m.midi === shiftedMidi);
+          if (mapped) {
+            dom.liveNoteBadge.textContent = mapped.note;
+            dom.liveKeyBadge.textContent = mapped.displayKey;
+
+            if (appState.stableFrames >= 3) {
+              dom.lockStatusText.textContent = tr('LOCKED');
+              dom.lockStatusText.className = 'text-[#00ff00] font-bold';
+
+              const isNewSemitone = appState.lastTriggeredMidi !== shiftedMidi;
+              if (isNewSemitone || appState.armedForRetrigger) {
+                appState.lastTriggeredMidi = shiftedMidi;
+                appState.armedForRetrigger = false;
+                appState.minRmsSinceTrigger = rms;
+                appState.peakRmsSinceTrigger = rms;
+                appendTypedKey(mapped);
+              }
+            } else {
+              dom.lockStatusText.textContent = tr('HOLD..');
+              dom.lockStatusText.className = 'text-[#ffff00]';
+            }
+          } else {
+            dom.liveNoteBadge.textContent = midiToFullNoteName(shiftedMidi);
+            dom.liveKeyBadge.textContent = '?';
+          }
+        }
+      } else {
+        // Silence / decay reset
+        appState.hist.length = 0;
+        appState.stableFrames = 0;
+        appState.candidateMidi = null;
+        if (rms < appState.noiseFloorRms * 0.85) {
+          appState.lastTriggeredMidi = null;
+          appState.armedForRetrigger = true;
+          appState.minRmsSinceTrigger = rms;
+        }
+
+        if (appState.mode === 'TYPE') {
+          dom.lockStatusText.textContent = tr('LISTEN');
+          dom.lockStatusText.className = 'text-[#00ffff]';
+        }
+      }
+
+      appState.rafId = requestAnimationFrame(audioAnalysisLoop);
+    }
+
+    // --- MICROPHONE START / STOP WITH BAND-PASS FILTERING ---
+    async function toggleMic() {
+      if (appState.isListening) {
+        appState.isListening = false;
+        if (appState.rafId) cancelAnimationFrame(appState.rafId);
+        if (appState.micStream) {
+          appState.micStream.getTracks().forEach((t) => t.stop());
+          appState.micStream = null;
+        }
+        dom.micToggleBtn.classList.remove('is-live');
+        dom.micToggleBtn.textContent = tr('[ MIC: OFF — TAP TO PLAY ]');
+        dom.statusTag.textContent = tr('READY');
+        dom.statusTag.className = 'text-base text-[#00ffff] font-bold';
+        updateSignalMeter(0);
+        return;
+      }
+
+      try {
+        const ctx = ensureAudioContext();
+        const stream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: false,
+            noiseSuppression: false,
+            autoGainControl: false
+          }
+        });
+
+        appState.micStream = stream;
+        const source = ctx.createMediaStreamSource(stream);
+
+        // Pre-filtering chain to reject pick clicks, fret buzz & upper harmonic octave jumps
+        const highPass = ctx.createBiquadFilter();
+        highPass.type = 'highpass';
+        highPass.frequency.value = 60;
+        highPass.Q.value = 0.7;
+
+        const lowPass = ctx.createBiquadFilter();
+        lowPass.type = 'lowpass';
+        lowPass.frequency.value = 1000;
+        lowPass.Q.value = 0.8;
+
+        const analyser = ctx.createAnalyser();
+        analyser.fftSize = 4096; // High resolution for low E2 (82.4 Hz)
+
+        source.connect(highPass);
+        highPass.connect(lowPass);
+        lowPass.connect(analyser);
+
+        appState.analyser = analyser;
+        appState.timeBuffer = new Float32Array(analyser.fftSize);
+        appState.isListening = true;
+
+        stopDemoPreview();
+        dom.micToggleBtn.classList.add('is-live');
+        dom.micToggleBtn.textContent = tr('[ MIC: ON — LISTENING ]');
+        dom.statusTag.textContent = tr('LIVE');
+        dom.statusTag.className = 'text-base text-[#00ff00] font-bold';
+
+        appState.hist = [];
+        appState.calibMin = 1;
+        appState.calibUntil = performance.now() + 450;
+        audioAnalysisLoop();
+      } catch (err) {
+        showToast(tr('MIC UNAVAILABLE — USE PAD BELOW'));
+      }
+    }
+
+    // --- UI CONTROLS & EVENT BINDINGS ---
+    dom.micToggleBtn.addEventListener('click', toggleMic);
+
+    dom.octaveToggleBtn.addEventListener('click', () => {
+      appState.octaveIdx = (appState.octaveIdx + 1) % OCTAVE_OPTIONS.length;
+      const shift = getOctaveShift();
+      const label = shift === 0 ? tr('OCT: 0 (E2=E)') : shift === 1 ? tr('OCT: +1 (LOW)') : tr('OCT: -1 (HIGH)');
+      dom.octaveToggleBtn.textContent = label;
+    });
+
+    dom.modeToggleBtn.addEventListener('click', () => {
+      appState.mode = appState.mode === 'TYPE' ? 'TUNER' : 'TYPE';
+      if (appState.mode === 'TUNER') {
+        dom.modeToggleBtn.textContent = tr('MODE: TUNER');
+        dom.modeToggleBtn.classList.remove('text-[#00ffff]');
+        dom.modeToggleBtn.classList.add('text-[#00ff00]');
+        dom.typeLivePanel.classList.add('hidden');
+        dom.tunerLivePanel.classList.remove('hidden');
+        dom.tunerLivePanel.classList.add('flex');
+      } else {
+        dom.modeToggleBtn.textContent = tr('MODE: TYPE');
+        dom.modeToggleBtn.classList.remove('text-[#00ff00]');
+        dom.modeToggleBtn.classList.add('text-[#00ffff]');
+        dom.tunerLivePanel.classList.add('hidden');
+        dom.tunerLivePanel.classList.remove('flex');
+        dom.typeLivePanel.classList.remove('hidden');
+      }
+    });
+
+    // Reference tuning buttons (E2, A2, D3, G3, B3, E4)
+    document.querySelectorAll('.ref-tune-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const midi = parseInt(btn.dataset.refMidi, 10);
+        const freq = midiToFreq(midi);
+        playPluckedNote(midi, 1.1);
+        updateTunerVisuals(freq, midi, 0);
+        dom.tunerInTuneLabel.textContent = `${tr('REF')}: ${btn.textContent} (${freq.toFixed(1)}Hz)`;
+      });
+    });
+
+    dom.btnSpace.addEventListener('click', () => {
+      stopDemoPreview();
+      appState.text += ' ';
+      dom.outputText.textContent = appState.text;
+    });
+
+    dom.btnDel.addEventListener('click', () => {
+      stopDemoPreview();
+      appState.text = appState.text.slice(0, -1);
+      dom.outputText.textContent = appState.text;
+    });
+
+    dom.btnClear.addEventListener('click', () => {
+      stopDemoPreview();
+      appState.text = '';
+      dom.outputText.textContent = '';
+      dom.liveNoteBadge.textContent = '--';
+      dom.liveKeyBadge.textContent = '_';
+    });
+
+    dom.btnCopy.addEventListener('click', () => {
+      const val = appState.text || dom.outputText.textContent;
+      if (!val) {
+        showToast(tr('EMPTY OUTPUT'));
+        return;
+      }
+      const ta = document.createElement('textarea');
+      ta.value = val;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand('copy');
+      document.body.removeChild(ta);
+      showToast(tr('COPIED TO CLIPBOARD!'));
+    });
+
+    window.addEventListener('load', () => {
+      initUi();
+      renderNotePad();
+      updateSignalMeter(0);
+    });
+  </script>
+</body>
+</html>
